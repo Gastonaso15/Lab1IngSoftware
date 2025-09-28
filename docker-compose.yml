@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: culturarte_db
+    environment:
+      MYSQL_DATABASE: culturarte
+      MYSQL_USER: culturarte
+      MYSQL_PASSWORD: culturarte123
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./docker/init-db:/docker-entrypoint-initdb.d:ro
+
+
+
+    healthcheck: #Esto hace que phpMyAdmin no intente conectarse hasta que db esté healthy. Mucho más fiable que “levantar y cruzar los dedos”.
+      test: [ "CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$MYSQL_ROOT_PASSWORD || exit 1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  phpmyadmin:
+    image: phpmyadmin:5.2.1
+    container_name: culturarte_pma
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      UPLOAD_LIMIT: 128M
+    ports:
+      - "8081:80"
+
+
+  app:
+    build: .
+    container_name: culturarte_app
+    environment:
+      DISPLAY: $DISPLAY
+      DOCKER: "true"
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./uploads:/app/uploads:ro
+    depends_on:
+      - db
+
+volumes:
+  db_data:
